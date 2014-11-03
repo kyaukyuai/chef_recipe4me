@@ -1,0 +1,46 @@
+require "guard/jobs/base"
+
+module Guard
+  module Jobs
+    class StdinJob
+      def initialize(options)
+        @mode = :stopped
+        @sleeping = false
+      end
+
+      def foreground
+        output "Guard is idle" # needed for child-process cucumber tests
+
+        line = $stdin.readline.chomp
+        return :exit if line == "exit"
+
+        m = /^sleep (?<seconds>\d+)$/.match(line)
+        return @mode unless m
+
+        seconds = Integer(m[:seconds][/\d+/])
+        @sleeping = true
+        sleep seconds
+        @sleeping = false
+        @mode
+      rescue EOFError, Interrupt
+        @sleeping = false
+        :exit
+      end
+
+      def background
+        Thread.main.wakeup if @sleeping
+      end
+
+      def handle_interrupt
+        @mode = :exit
+      end
+
+      private
+
+      def output(text)
+        $stdout.puts text
+        $stdout.flush
+      end
+    end
+  end
+end
